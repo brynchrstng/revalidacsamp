@@ -1,0 +1,79 @@
+config:
+  target: '<target endpoint>'
+  phases:
+    - duration: 60
+      arrivalRate: 30
+      rampTo: 50
+      name: "Warm Up"
+    - duration: 100
+      arrivalRate: 40
+      name: "Sustained max load"
+  payload:
+    path: "loadtest.csv"
+    fields:
+      - "passengerId"
+      - "driverId"
+      - "location"
+      - "bookingLocation"
+      - "targetLocation"
+scenarios:
+  - name: "Books a new ride and returns a ride ID"
+  - flow:
+    - post:
+        url: "/rides"
+        json:
+          passengerId: "{{ passengerId }}"
+          driverId: "{{ driverId }}"
+          location: "{{ location }}"
+          bookingLocation: "{{ bookingLocation }}"
+          targetLocation: "{{ targetLocation }}"
+        capture:
+          json: "$.result.rideId"
+          as: "rideId"
+    - think: 15
+    - get:
+        url: "/rides/{{ rideId }}"
+
+  - name: "Returns the state of a ride ID."
+  - flow:
+    - get:
+        url: "/rides/{{ rideId }}"
+
+  - name: "Accepts the current longitude and latitude of a driver"
+  - flow:
+    - post:
+        url: "/drivers/:driverId/location/"
+        json:
+          driverId: "{{ driverId }}"
+          location: "{{ location }}"
+          bookingLocation: "{{ bookingLocation }}"
+          targetLocation: "{{ targetLocation }}"
+
+  - name: "Returns the longitude and latitude of a rider."
+  - flow:
+    - get:
+        url: "/riders/:riderId/location/{{ location }}"
+
+  - name: "Updates the current longitude and latitude of a rider."
+  - flow:
+    - post:
+        url: "/riders/:riderId/location"
+        json:
+          rideId: "{{ rideId }}"
+          location: "{{ location }}"
+
+  - name: "Returns a list of rides that the driver can accept. The list of rides is determined by the Ride Scheduling Algorithm."
+  - flow:
+    - post:
+        url: "/drivers/:driverId/ /rides/acceptable"
+        json:
+          rideId: "{{ rideId }}"
+          driverId: "{{ driverId }}"
+
+  - name: "Accepts the ride request (driver side.)"
+  - flow:
+    - post:
+        url: "/drivers/:driverId/rides/:rideId/accept"
+        json:
+        driverId: "{{ driverId }}"
+        bookingLocation: "{{ bookingLocation }}"
